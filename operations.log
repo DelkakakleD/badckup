@@ -152,3 +152,12 @@ Setup:
 - Auth via gh CLI (device login flow)
 - backup-full.sh pushes config changes to GitHub after each backup
 - 3am cron pushes config + MongoDB dump + logs nightly
+
+============================================================
+2026-05-18 17:09 UTC — Hourly git + mongodump backup added
+============================================================
+- backup-hourly.sh: git commit/push + mongodump every hour
+  (keeps hourly mongodumps for 48 hours)
+- Runs via /etc/cron.hourly/galaxybot-backup
+- Full nightly backup (with tarball) at 3am unchanged
+- Hourly dump is ~820K, completes in ~1 second
