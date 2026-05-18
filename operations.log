@@ -144,3 +144,11 @@ Setup:
   - Packages into dated tarball, retains 7 days
 - Cron: 0 3 * * * (3am daily)
 - Push to remote: PENDING (waiting for remote URL from user)
+
+============================================================
+2026-05-18 17:07 UTC — Remote git backup configured
+============================================================
+- GitHub remote added: https://github.com/DelkakakleD/badckup.git
+- Auth via gh CLI (device login flow)
+- backup-full.sh pushes config changes to GitHub after each backup
+- 3am cron pushes config + MongoDB dump + logs nightly
