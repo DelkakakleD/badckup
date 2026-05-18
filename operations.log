@@ -129,3 +129,18 @@ Known quirks (for catch-up after restart):
    Note: LoginRateLimiter and ApiRateLimiter class files in JAR also have
          byte-level patches (return-false -> return-true) from earlier
          attempts; they no longer affect the actual rate limit behavior
+
+============================================================
+2026-05-18 16:46 UTC — Full backup system set up (git + cron)
+============================================================
+Setup:
+- Git repo initialized in SRVRINSTALL/ (tracks all configs, scripts)
+- backup-full.sh: comprehensive nightly backup script
+  - git add/commit of all config changes
+  - mongodump of go2super DB (player accounts, game data)
+  - systemd service file snapshots
+  - server logs (last 7 days)
+  - game-server JAR copy
+  - Packages into dated tarball, retains 7 days
+- Cron: 0 3 * * * (3am daily)
+- Push to remote: PENDING (waiting for remote URL from user)
