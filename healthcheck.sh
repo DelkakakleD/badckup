@@ -27,7 +27,7 @@ echo "  Logs: $(du -sh /opt/galaxybot/logs 2>/dev/null | cut -f1 || echo '0B')"
 
 echo ""
 echo "--- Login Test ---"
-TOKEN=$(curl -s -m 5 http://localhost:9090/login/login/account \
+TOKEN=$(curl -s -m 5 http://localhost:9090/login/account \
   -X POST -H "Content-Type: application/json" \
   -d '{"username":"testuser","password":"test1234"}' 2>/dev/null)
 if echo "$TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('code')==200 else 1)" 2>/dev/null; then
