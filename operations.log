@@ -113,22 +113,33 @@ Swap file:
   - Prevents OOM kills when Java heap + system memory peak
 
 Known quirks (for catch-up after restart):
-  1. start.sh now uses systemctl for MongoDB (not direct --fork)
-  2. ws-bridge.py includes crossdomain listener on port 843
-  3. galaxybot-wsbridge.service has AmbientCapabilities=CAP_NET_BIND_SERVICE
-  4. BCrypt passwords must use $2a$ prefix (not $2b$) for Spring Boot compat
-  5. Accounts: admin/testuser/testuser2 all use password 'test1234'
-  6. Dashboard: admin@supergo2.com / Ff5E!68a*5on
-   7. Rate limiter blocks IP after failed login attempts (30 min cooldown)
-   8. Dashboard registration rate limit bypassed: LoginService.register IP
-      conflict check patched (pop+iconst_0 replaces List.size() call,
-      so ifle always jumps to skip REGISTRATION_LIMIT_REACHED)
+   1. start.sh now uses systemctl for MongoDB (not direct --fork)
+   2. ws-bridge.py includes crossdomain listener on port 843
+   3. galaxybot-wsbridge.service has AmbientCapabilities=CAP_NET_BIND_SERVICE
+   4. BCrypt passwords must use $2a$ prefix (not $2b$) for Spring Boot compat
+   5. All accounts use password 'test1234' (bcrypt $2a$)
+   6. Dashboard admin login: admin@supergo2.com / Ff5E!68a*5on
+   7. Login rate limiter: 5 failed attempts → 30 min cooldown (LoginRateLimiter)
+   8. Registration IP check patched in LoginService bytecode (no per-IP limit)
    9. AccountCache is in-memory — DB changes need server restart
-   9. MongoDB auth user: galaxybot / Hak4oYk44ZahfRrepkFc
-   10. Port 843 requires CAP_NET_BIND_SERVICE capability to bind as non-root
-   Note: LoginRateLimiter and ApiRateLimiter class files in JAR also have
-         byte-level patches (return-false -> return-true) from earlier
-         attempts; they no longer affect the actual rate limit behavior
+  10. MongoDB auth: galaxybot / Hak4oYk44ZahfRrepkFc
+  11. Port 843 requires CAP_NET_BIND_SERVICE capability (privileged port)
+  12. Git repo at SRVRINSTALL/ pushes to github.com/DelkakakleD/badckup
+  13. Hourly cron: git commit/push + mongodump (/etc/cron.hourly/galaxybot-backup)
+  14. Full backup (tarball) at 3am daily, 7-day retention
+
+Complete account list (all password: test1234):
+  - testuser  / your@email.com        / ADMIN
+  - admin     / admin@game.com        / ADMIN
+  - testuser2 / testuser2@email.com    / USER
+  - newp5     / newp5@test.com        / USER
+  - finalfix2 / finalfix2@test.com    / USER
+  - finalfx3  / finalfx3@test.com     / USER
+  - TESTER    / test@test.com         / USER
+
+Note: LoginRateLimiter and ApiRateLimiter class files in JAR also have
+      byte-level patches (return-false -> return-true) from earlier
+      attempts; they no longer affect actual rate limit behavior
 
 ============================================================
 2026-05-18 16:46 UTC — Full backup system set up (git + cron)
