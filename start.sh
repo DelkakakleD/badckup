@@ -29,8 +29,14 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
+# 1.5) Pre-flight account integrity check
+echo "  [1.5/4] Checking account integrity..."
+if [ -f "$SCRIPT_DIR/check-accounts.sh" ]; then
+    sudo bash "$SCRIPT_DIR/check-accounts.sh"
+fi
+
 # 2) Game Server
-echo "  [2/3] Starting Game Server..."
+echo "  [2/4] Starting Game Server..."
 sudo systemctl start galaxybot-server
 
 # Wait for server to be ready (max 120s)
@@ -45,7 +51,7 @@ for i in $(seq 1 120); do
 done
 
 # 3) WS Bridge
-echo "  [3/3] Starting WS Bridge..."
+echo "  [3/4] Starting WS Bridge..."
 sudo systemctl start galaxybot-wsbridge
 sleep 2
 

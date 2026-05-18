@@ -136,6 +136,7 @@ Complete account list (all password: test1234):
   - finalfix2 / finalfix2@test.com    / USER
   - finalfx3  / finalfx3@test.com     / USER
   - TESTER    / test@test.com         / USER
+  - Amerz     / amerz@test.com        / USER     / HONEY
 
 Note: LoginRateLimiter and ApiRateLimiter class files in JAR also have
       byte-level patches (return-false -> return-true) from earlier
@@ -172,3 +173,34 @@ Setup:
 - Runs via /etc/cron.hourly/galaxybot-backup
 - Full nightly backup (with tarball) at 3am unchanged
 - Hourly dump is ~820K, completes in ~1 second
+
+============================================================
+2026-05-18 18:50 UTC — Server restart (rate limiter reset for Amerz)
+============================================================
+Reason: Amerz (amerz@test.com, USER) had too many failed login attempts,
+  triggering the in-memory LoginRateLimiter (30-min cooldown).
+Fix: Restarted galaxybot-server.service to clear the in-memory rate limiter.
+  All 6 ports came back up clean (9090, 9091, 90, 843, 27017, 5150).
+Result: Amerz can now log in with password HONEY.
+
+============================================================
+2026-05-18 ~18:52 UTC — Amerz password fixed (was wrong hash in DB)
+============================================================
+Issue: The bcrypt hash stored in game_accounts for Amerz did NOT match
+  password "HONEY" — it was leftover from a previous unknown password.
+Fix: Generated a fresh $2a$ bcrypt hash for "HONEY" and updated the
+  account directly in MongoDB. Restarted server to reload AccountCache.
+Result: Amerz / HONEY login should now work.
+
+============================================================
+2026-05-18 ~18:54 UTC — Delk account restored (was orphaned after restart)
+============================================================
+Issue: After server restart, Delk's game_accounts entry was missing.
+  game_users still had all Delk data (L81, resources intact), but
+  the accountId pointed to an _id that the "testuser recreate at 15:05"
+  had overwritten with testuser. Before restart, the stale AccountCache
+  masked this; after restart the cache rebuilt from DB and Delk vanished.
+Fix: Created fresh game_accounts entry for Delk (delk@supergo2.com,
+  password test1234, rank USER) and relinked game_users.accountId.
+  Restarted server to reload AccountCache.
+Result: Delk restored with all progress intact.
