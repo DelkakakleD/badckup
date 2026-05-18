@@ -1,0 +1,138 @@
+==========================================
+  GalaxyBot Server - READ THIS FIRST
+==========================================
+
+WHAT THIS IS:
+  A complete portable installation package for the GalaxyBot game server.
+  Everything needed to run the server on a fresh Linux machine.
+
+==========================================
+  PACKAGE CONTENTS
+==========================================
+
+SRVRINSTALL/
+├── READTHISFIRST.TXT              # This file
+├── README.txt                     # Full documentation + changelog
+├── install.sh                     # Auto-installer (checks OS, Java 21, MongoDB, creates user)
+├── start.sh                       # Start all 3 services + wait for readiness
+├── stop.sh                        # Stop all 3 services + show status
+├── game-server-0.8.1.jar          # ~55MB fat JAR (Spring Boot, self-contained)
+├── ws-bridge.py                   # WebSocket-to-TCP bridge (Python 3)
+├── galaxybot-server.service       # systemd service (auto-detects Java 21 path)
+├── galaxybot-mongod.service       # systemd service (MongoDB fork workaround)
+├── galaxybot-wsbridge.service     # systemd service (WebSocket bridge)
+├── mongod.conf                    # MongoDB config (3GB WiredTiger cache limit)
+├── 99-galaxybot.conf              # sysctl config (swappiness=10)
+└── deps/                          # Offline .deb packages
+    ├── openjdk-21-jre-headless_21.0.11~9ea-1_amd64.deb
+    ├── mongodb-org-server_8.0.23_amd64.deb
+    ├── mongodb-mongosh_2.8.3_amd64.deb
+    ├── mongodb-org_8.0.23_amd64.deb
+    ├── mongodb-org-database_8.0.23_amd64.deb
+    ├── mongodb-org-database-tools-extra_8.0.23_amd64.deb
+    ├── mongodb-org-mongos_8.0.23_amd64.deb
+    ├── mongodb-org-shell_8.0.23_amd64.deb
+    └── python3-websockets_15.0.1-1+b1_amd64.deb
+
+==========================================
+  QUICK DEPLOY (3 COMMANDS)
+==========================================
+
+  1. Copy to target server:
+       scp -r SRVRINSTALL/ root@<server-ip>:/opt/
+
+  2. Install (as root):
+       cd /opt/SRVRINSTALL
+       sudo ./install.sh
+
+  3. Start:
+       sudo ./start.sh
+
+==========================================
+  PORTS
+==========================================
+
+  9090/tcp  — HTTP REST API + Admin Dashboard
+  9091/tcp  — WebSocket bridge
+  5150/tcp  — Game login socket
+  90/tcp    — Game server socket
+
+  Open these in your firewall. NAT forwarding from host to guest if using a VM.
+
+==========================================
+  ADMIN DASHBOARD
+==========================================
+
+  URL:      http://<server-ip>:9090/dashboard.html
+  Email:    admin@supergo2.com
+  Password: Set via environment variable before starting:
+            export GALAXYBOT_ADMIN_PASSWORD="YourPasswordHere"
+            (Default: Ff5E!68a*5on — CHANGE THIS IN PRODUCTION!)
+
+  Dashboard has 13 tabs: Overview, Players, Accounts, Game Accounts,
+  Player, Bans, Admin, Config, Restart, Resources, Commands, Logs, Gift
+
+==========================================
+  REQUIREMENTS
+==========================================
+
+  - Debian 12+ or RHEL 9+ Linux (64-bit)
+  - 4GB RAM minimum, 8GB recommended
+  - 10GB free disk space
+  - Root/sudo access
+  - Internet access during install (to download Java 21 and MongoDB if needed)
+  - Offline install supported: all .deb packages included in deps/
+
+==========================================
+  MANUAL CONTROL
+==========================================
+
+  Start all:    sudo ./start.sh
+  Stop all:     sudo ./stop.sh
+  Status:       sudo systemctl status galaxybot-mongod galaxybot-server galaxybot-wsbridge
+  Logs:         sudo journalctl -u galaxybot-server -f
+
+  Or individually:
+  Start:  sudo systemctl start galaxybot-mongod galaxybot-server galaxybot-wsbridge
+  Stop:   sudo systemctl stop galaxybot-wsbridge galaxybot-server galaxybot-mongod
+
+==========================================
+  GAME ACCOUNTS (auto-created on first start)
+==========================================
+
+  admin    / test123    (ADMIN rank, all permissions)
+  testuser / test123    (USER rank)
+  testuser2/ test123    (USER rank)
+
+  Login via game client on port 5150.
+
+  NOTE: Account passwords are bcrypt-hashed. The default admin dashboard
+  password (Ff5E!68a*5on) can be overridden with GALAXYBOT_ADMIN_PASSWORD
+  env var before starting the server.
+
+==========================================
+  TROUBLESHOOTING
+==========================================
+
+  MongoDB fails to start:
+    - The included galaxybot-mongod.service uses --fork workaround
+      for kernel compatibility issues (SERVER-121912)
+    - Do NOT use the default mongod.service — it will fail on Linux 6.19+
+    - Check logs: sudo journalctl -u galaxybot-mongod -n 50
+
+  Server won't start:
+    - Check Java 21 is installed: java -version
+    - Check MongoDB is running: systemctl status galaxybot-mongod
+    - View logs: sudo journalctl -u galaxybot-server -n 50
+    - Wait up to 60s for full startup
+
+  Port not accessible:
+    - Check firewall: sudo ufw allow 9090,9091,5150,90
+    - Check VirtualBox port forwarding if using a VM
+    - Verify with: ss -tlnp | grep -E '9090|5150|90'
+
+  Performance:
+    - swappiness set to 10 (reduces swap usage)
+    - THP disabled (prevents latency spikes in Java/MongoDB)
+    - MongoDB WiredTiger cache capped at 3GB
+    - All three tuned via install.sh

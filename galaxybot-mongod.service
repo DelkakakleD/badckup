@@ -1,0 +1,16 @@
+[Unit]
+Description=GalaxyBot MongoDB (workaround for kernel compat issue)
+After=network-online.target
+
+[Service]
+Type=forking
+User=mongodb
+Group=mongodb
+ExecStart=/usr/bin/mongod --config /etc/mongod.conf --fork --logpath /var/log/mongodb/mongod.log
+ExecStop=/usr/bin/mongod --shutdown --config /etc/mongod.conf
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

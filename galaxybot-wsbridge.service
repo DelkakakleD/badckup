@@ -1,0 +1,19 @@
+[Unit]
+Description=GalaxyBot WebSocket-to-TCP Bridge
+After=network-online.target galaxybot-server.service
+Wants=galaxybot-server.service
+
+[Service]
+Type=simple
+User=galaxybot
+Group=galaxybot
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Environment=WS_BRIDGE_TOKEN=
+WorkingDirectory=/opt/galaxybot
+ExecStart=/usr/bin/python3 /opt/galaxybot/ws-bridge.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

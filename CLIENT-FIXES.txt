@@ -1,0 +1,98 @@
+=== GalaxyBot Client Launcher Fixes - May 17 2026 ===
+
+Bugs found and fixed in the C# client launcher (GO2FlashLauncher):
+
+1. HostHandlerService.cs:89,99-102 — SocketHost 3rd-line override was MISSING
+   The README documented reading lines[2] from the host file for the WebSocket
+   SocketHost, but the code was never written. _socketHost was always hardcoded:
+     Release: ws://103.91.67.247 (production Asia IP)
+     Debug:   ws://123.253.35.253 (random wrong IP)
+   Fix: In the #else (Debug) block, read SocketHost from lines[2] with fallback.
+        Added lines[2] override AFTER _clientHost/_announceHost assignment so it
+        also works in Release mode (overrides the ping-based production IPs).
+
+2. ResourceHandlerService.cs:26 — Malformed GameUrl FlashVar
+   GameUrl was: 'https://' + Program.HostHandler.ClientHost
+   With ClientHost = 'http://localhost:9090', result was:
+     'https://http://localhost:9090//'  (malformed, SWF can't make API calls)
+   Fix: Changed to 'https://' + Program.Host (= 'localhost')
+     Result: 'https://localhost/'  (correct, CEF scheme handler intercepts it)
+
+3. WebRequestResourceHandler.cs:32-40 — Double URL host replacement
+   Both WebRequestResourceHandler and GO2HttpService.GetData() did the same
+   host replacement (localhost -> localhost:9090), producing:
+     https://localhost:9090:9090/api/path  (double port)
+   Fix: Removed the pre-replacement from WebRequestResourceHandler, pass raw
+        request.Url to GetData/PostFormData (which handle the replacement once).
+
+4. AppController.java (NEW) — Missing /app endpoints for Release builds
+   Release build checks /app/version.json at startup. If missing or wrong,
+   it shows "Client expired" and exits before loading the SWF.
+   Added: GET /app/version.json  -> "v1.1.1c"
+          GET /app/gamedata.json -> "[]"
+          GET /app/download.json -> ""
+
+
+=== Build Notes ===
+
+The C# launcher CANNOT be cross-compiled on Linux because:
+  - CefSharp.WinForms requires native Windows browser DLLs
+  - Costura.Fody embeds native DLLs at compile time (Linux can't find them)
+Must build on Windows with: dotnet build -c Debug
+
+The Java server (AppController.java) builds on Kali with:
+  JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./mvnw clean package -DskipTests
+
+
+=== Files Changed ===
+
+GO2FlashLauncher/Service/HostHandlerService.cs       (+4 lines, SocketHost override)
+GO2FlashLauncher/Service/ResourceHandlerService.cs    (1 line, GameUrl fix)
+GO2FlashLauncher/Service/WebRequestResourceHandler.cs (removed double Replace)
+GO2Server/src/main/java/.../controller/AppController.java (NEW, 3 stub endpoints)
+
+
+=== RBP Red Warning Fix (May 17 2026) ===
+
+The text "(Can only be upgraded by a Colonel)" appeared in red when hovering
+over View or Build buttons on RBP planet buildings. Three layers of fix needed:
+
+1. ConstructionOperationWidget.as: Added _viewBtn.setBtnDisabled(false) in
+   Validate() when isConsortiaLeader is true, preventing the View button from
+   showing as disabled/red.
+
+2. CTipInfo.as (initStarLevel + initBaseStarLevel): Added ReSetShowState
+   for CommentDesc when isConsortiaLeader to hide the warning text field.
+
+3. GameRes.swf XML layouts (BaseStarLevelInfoXml, StarLevelnfoXml):
+   Changed IsShow="1" -> IsShow="0" for the CommentDesc elements containing
+   "(Can only be upgraded by a Colonel)". The XML had duplicate CommentDesc
+   elements per layout, making AS3 ReSetShowState unable to target both.
+   This was the root cause — the text was baked into GameRes.swf XML with
+   IsShow="1" by default.
+
+Files changed:
+  - GO2FlashLauncher/gamedata/asset/client.go2    (AS3 patches)
+  - GO2FlashLauncher/gamedata/asset/gameres.go2   (XML layout patches)
+  - GO2SWFCompiler/client/asset/Client_patched.swf
+  - GO2SWFCompiler/client/asset/GameRes.swf
+
+
+=== Remaining Known Issues ===
+
+  - Disposable email blocking: deferred for production
+  - Password complexity rules: deferred for production
+  - techUpgradeInfo 20 magic-number entries: needs ActionScript source
+  - UserResources larger max value: deferred until Flash client retired
+  - Delete server feature: deliberately deferred
+
+
+=== Production Switch Notes ===
+
+Hardcoded IPs in HostHandlerService.cs (#if !DEBUG / Release block):
+  - Lines 29-30: Pings 103.91.67.247 (Asia) and 69.197.152.216 (US)
+  - Lines 39-84: _socketHost assigned to ws://103.91.67.247 or ws://69.197.152.216
+  - The 3rd-line host file override (lines 99-102) fixes _socketHost afterward
+  - But the ping itself still fires on startup in Release mode
+  - When switching to production, update these IPs to actual production servers
+  - Debug mode uses local host file only (no pings) — fine for dev

@@ -1,0 +1,4 @@
+*.jar
+backups/
+*.pyc
+__pycache__/

@@ -1,0 +1,28 @@
+[Unit]
+Description=GalaxyBot Game Server (Spring Boot)
+After=network-online.target galaxybot-mongod.service
+Wants=galaxybot-mongod.service
+
+[Service]
+Type=simple
+User=galaxybot
+Group=galaxybot
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+Environment=GALAXYBOT_DB_PASSWORD=changeme
+Environment=GALAXYBOT_ADMIN_PASSWORD=Ff5E!68a*5on
+WorkingDirectory=/opt/galaxybot
+ExecStart=/usr/lib/jvm/java-21-openjdk-amd64/bin/java \
+  -Xms2g -Xmx6g \
+  -XX:+UseG1GC -XX:MaxGCPauseMillis=100 \
+  -XX:+ParallelRefProcEnabled \
+  -XX:+AlwaysPreTouch \
+  -XX:+UseStringDeduplication \
+  --add-opens java.base/java.lang=ALL-UNNAMED \
+  --add-opens java.base/java.util=ALL-UNNAMED \
+  -jar /opt/galaxybot/game-server-0.8.1.jar
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
