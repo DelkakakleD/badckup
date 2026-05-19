@@ -297,3 +297,5 @@ Services running:
 2026-05-19 20:13 UTC — Restore point created: galaxybot-restore-20260519-201305 (164M)
   File: /opt/galaxybot/restore-points/galaxybot-restore-20260519-201305.tar.gz
 
+2026-05-19 20:45 UTC — AGENTS.md created with full project context
+2026-05-19 20:47 UTC — AGENTS.md expanded with ground mapping, password hash reqs, bytecode patches, welcome email items, rebuild steps, doc structures, quick fixes
