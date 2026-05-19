@@ -1,0 +1,172 @@
+=================================================================
+  GalaxyBot User Creation Guide
+  Server: http://localhost:9090
+  Last verified: 2026-05-19
+=================================================================
+
+NOTE: All login API paths use a double /login/ prefix because the
+class-level @RequestMapping("/login") combines with the method-level
+@PostMapping("/login/account"), making the effective URL:
+  POST /login/login/account
+
+Similarly, registration is at:
+  POST /login/register/account
+
+And character creation is at:
+  POST /account/create/user
+
+=================================================================
+  STEP 1 — Register the Account
+=================================================================
+
+Send a POST to /login/register/account with:
+  email     — any valid email string
+  username  — desired account/login name
+  password  — plain text password
+  captcha   — "admin-bypass" (bypass disabled hCaptcha)
+  otp       — "admin-bypass"
+
+Example:
+  curl -s -X POST http://localhost:9090/login/register/account \
+    -H "Content-Type: application/json" \
+    -d '{"email":"amerzz@test.com","username":"Amerzz",\
+         "password":"honey","captcha":"admin-bypass","otp":"admin-bypass"}'
+
+Expected response:
+  {"code":200,"message":"REGISTER_ACCOUNT_COMPLETED"}
+
+=================================================================
+  STEP 2 — Login to Get Session Token
+=================================================================
+
+Send a POST to /login/login/account with:
+  username  — the registered username
+  password  — the plain text password
+
+Example:
+  curl -s -X POST http://localhost:9090/login/login/account \
+    -H "Content-Type: application/json" \
+    -d '{"username":"Amerzz","password":"honey"}'
+
+Expected response:
+  {"code":200,"message":"LOGIN_COMPLETED","data":{
+    "email":"amerzz@test.com","username":"Amerzz",
+    "vip":0,"rank":"USER",
+    "token":"<64-char-hex-token>",
+    "maxPlanet":3
+  }}
+
+Save the returned token — you need it for character creation.
+
+=================================================================
+  STEP 3 — Create Character (User + Planet)
+=================================================================
+
+Send a POST to /account/create/user with:
+  username  — the character name (can match account name)
+  ground    — planet type: 1=green, 2=desert, 3=ice
+              (stored internally as ground=2,0,1 respectively)
+Include the Authorization header with the token from Step 2.
+
+Example:
+  curl -s -X POST http://localhost:9090/account/create/user \
+    -H "Content-Type: application/json" \
+    -H "Authorization: <token>" \
+    -d '{"username":"Amerzz","ground":1}'
+
+Expected response:
+  {"code":200,"message":"CREATE_COMPLETED"}
+
+This creates:
+  - A User document in game_users with auto-generated userId and guid
+  - A UserPlanet document in game_planets at a random galaxy position
+  - All sub-objects (resources, ships, buildings, techs, etc.)
+
+=================================================================
+  STEP 4 — Verify the Play Endpoint
+=================================================================
+
+Send a GET to /account/play/user/{userId} with the Authorization token.
+The userId is returned in the create response. You can find it in
+MongoDB: db.game_users.findOne({username:"Amerzz"}).userId
+
+Example:
+  curl -s "http://localhost:9090/account/play/user/<userId>" \
+    -H "Authorization: <token>"
+
+Expected response:
+  {"code":200,"message":"OK","data":{"sessionKey":"...","userId":<userId>}}
+
+=================================================================
+  STEP 5 — Fix Missing Fields in MongoDB (BUG WORKAROUND)
+=================================================================
+
+The patched JAR's createUser() method does not initialize all required
+sub-object fields. Two critical ones cause NullPointerException when
+the client enters the planet frame:
+
+  - game_tasks.currentDaily   → null (needs [])
+  - game_ships.repair         → null (needs [])
+
+Additional fields that may be missing:
+  - game_tasks.claimedDailyAwards  → []
+  - game_bionic_chips.phases       → [1,0,0,0,0]
+  - game_rewards.until             → new Date()
+  - game_stats.iglStats            → {claimed:false, entries:0, fleetIds:[], rank:0}
+
+Run this MongoDB update:
+
+  db.game_users.updateOne(
+    {username: "Amerzz"},
+    {$set: {
+      "game_ships.repair": [],
+      "game_tasks.currentDaily": [],
+      "game_tasks.claimedDailyAwards": [],
+      "game_bionic_chips.phases": [1,0,0,0,0],
+      "game_rewards.until": new Date(),
+      "game_stats.iglStats": {claimed: false, entries: 0, fleetIds: [], rank: 0}
+    }}
+  );
+
+=================================================================
+  STEP 6 — Restart the Server
+=================================================================
+
+The server caches all data in memory at startup. MongoDB changes are
+NOT picked up until the server restarts.
+
+  sudo systemctl restart galaxybot-server
+  sleep 20
+
+Verify all 3 services are active:
+  sudo systemctl status galaxybot-server galaxybot-wsbridge galaxybot-mongod
+
+Verify ports:
+  ss -tlnp | grep -E '9090|9091|5150|90 |27017'
+
+=================================================================
+  KNOWN ISSUES
+=================================================================
+
+1. Auto-increment counters are NOT persisted — the game_auto_increments
+   collection is empty. After every server restart, getNextUserId() and
+   getNextGuid() reset to 1. New users created after restart may get
+   userId/guid values that collide with existing users. Until this is
+   fixed in the JAR, create the counter documents manually:
+
+     db.game_auto_increments.insertMany([
+       {name: "game_users", current: <max-guid+1>},
+       {name: "game_planets", current: <max-userId+1>}
+     ]);
+
+2. Each user MUST have a unique userId AND a matching USER_PLANET with
+   that same userId. The planet lookup (PlanetCache.findUserPlanet)
+   searches by userId and returns the first match — so duplicate userIds
+   across different users will cause the wrong planet to load.
+
+3. After any MongoDB data fix, the server must be restarted to refresh
+   in-memory caches.
+
+=================================================================
+  END OF GUIDE
+=================================================================

@@ -204,3 +204,96 @@ Fix: Created fresh game_accounts entry for Delk (delk@supergo2.com,
   password test1234, rank USER) and relinked game_users.accountId.
   Restarted server to reload AccountCache.
 Result: Delk restored with all progress intact.
+
+============================================================
+2026-05-19 — Account creation pipeline built + userId fix
+============================================================
+
+Context: We had to reimage the VM. After reimage, fresh DB had
+1 account (testuser). Creating playable accounts required
+multiple manual steps that kept failing (500 errors, NPE,
+planet load issues).
+
+Root cause analysis (from decompiling game-server-patched.jar):
+
+1. API path quirk: LoginController has class-level
+   @RequestMapping("${application.services.login}") = "/login",
+   and method-level @PostMapping("/login/account"), making
+   effective login path: POST /login/login/account (NOT /login/account).
+
+2. createUser() missing fields: The JAR's AccountService.createUser()
+   does NOT initialize these sub-object fields:
+   - game_tasks.currentDaily (null → NPE "Cannot stream() currentDaily")
+   - game_ships.repair (null → NPE "repair is null" in scheduled task)
+   - game_tasks.claimedDailyAwards
+   - game_bionic_chips.phases
+   - game_rewards.until
+   - game_stats.iglStats
+   - game_user_emails
+
+3. userId collision: AutoIncrementService.getNextUserId() uses
+   key "game_planets" in the auto_increment collection, which
+   is EMPTY (never created). Starts at 1 on every restart, so
+   multiple users get userId=2.
+
+4. PlanetCache.findUserPlanet(userId) returns findFirst() matching
+   USER_PLANET. Duplicate userIds cause wrong planet to load.
+
+5. Character creation via API sets User.ground mapping:
+   input 1→2, 2→0, 3→1 (stored values).
+
+Accounts before work:
+  - testuser (pre-existing, had character TESTING with userId=2)
+  - TEST3 (created during endpoint discovery, deleted)
+
+New accounts created during testing/fixes:
+  - TEST2 / test1234    — userId=3
+  - Amerzz / honey      — userId=4
+  - testfinal / test1234 — userId=41
+  - DAtest / test1234   — userId=29401
+  - Newtest / test1234  — userId=29402
+
+All have unique userIds, planets, and fixed sub-object fields.
+
+New/modified files:
+
+SRVRINSTALL/USERCREATION.txt
+  - Step-by-step account creation guide
+
+SRVRINSTALL/admin-register.py (updated)
+  - Added POST /admin/create — single-call account creation
+    (register + login + create character + MongoDB fix + restart)
+  - Added POST /admin/finalize — standalone MongoDB fix endpoint
+  - Added GET /admin/list — list all accounts with planet status
+  - Added GET /admin/health — health check
+  - Added GET / — serves HTML account creation form
+  - Listens on 0.0.0.0:9191
+  - Runs as systemd service galaxybot-admin.service
+
+SRVRINSTALL/create-account.py (NEW)
+  - Interactive TUI for account creation
+  - Run: python3 /opt/galaxybot/create-account.py
+
+/etc/systemd/system/galaxybot-admin.service
+  - New systemd service for admin-register.py
+
+Known issues:
+  - game_auto_increments collection is empty (auto-increment
+    counters not persisted). After server restart, new accounts
+    may get userId=2 (collision). The finalize script detects
+    and assigns the next available userId automatically.
+  - Dashboard.html Register tab calls _api() which overrides
+    Authorization header with admin token, breaking character
+    creation. Use http://<server>:9191/ instead.
+  - game-server-patched.jar's zip entries have CRC warnings
+    from failed zip -f attempts. Backup at .bak preserves
+    original.
+
+Services running:
+  - galaxybot-mongod     — MongoDB 8.0
+  - galaxybot-server     — Java 21 Spring Boot (game-server-patched.jar)
+  - galaxybot-wsbridge   — ws-bridge.py (WebSocket ↔ TCP + crossdomain)
+  - galaxybot-admin      — admin-register.py (port 9191)
+2026-05-19 20:13 UTC — Restore point created: galaxybot-restore-20260519-201305 (164M)
+  File: /opt/galaxybot/restore-points/galaxybot-restore-20260519-201305.tar.gz
+
