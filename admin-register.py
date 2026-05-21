@@ -1,12 +1,14 @@
 import json
 import os
+import socket
 import subprocess
 import sys
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-GAME_SERVER = "http://127.0.0.1:9090"
+GAME_SERVER = "http://127.0.0.1:44444"
+MONGO_URI = "mongodb://galaxybot:Hak4oYk44ZahfRrepkFc@127.0.0.1:27017/go2super"
 
 REGISTER_HTML = '''<!DOCTYPE html>
 <html lang="en">
@@ -41,7 +43,7 @@ h1 { font-size:22px; text-align:center; margin-bottom:20px; color:#f0f2f5; }
   <div class="error" id="error"></div>
   <div class="success" id="success"></div>
   <div class="step" id="step"></div>
-  <div class="back-link"><a href="http://{}:{}/dashboard.html" target="_blank">Back to Dashboard</a></div>
+  <div class="back-link"><a href="http://{}:44444/dashboard.html" target="_blank">Back to Dashboard</a></div>
 </div>
 <script>
 const stepEl = document.getElementById('step');
@@ -146,7 +148,7 @@ FIX_FIELDS_SCRIPT = '''
 
 class AdminRegisterHandler(BaseHTTPRequestHandler):
     server_ip = "127.0.0.1"
-    server_port = "9090"
+    server_port = "44444"
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -155,7 +157,12 @@ class AdminRegisterHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
 
+    def handle(self):
+        self.close_connection = True
+        self.handle_one_request()
+
     def do_GET(self):
+        self.close_connection = True
         if self.path in ("/", "/register", "/register.html"):
             html = REGISTER_HTML.replace("{}", self.server_ip).replace("{}", self.server_port)
             self.send_response(200)
@@ -166,6 +173,8 @@ class AdminRegisterHandler(BaseHTTPRequestHandler):
             self._respond(200, "UP")
         elif self.path == "/admin/list":
             self._handle_list()
+        elif self.path == "/admin/status":
+            self._handle_status()
         else:
             self.send_error(404)
 
@@ -263,32 +272,47 @@ class AdminRegisterHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._respond(500, "Error: " + str(e))
 
-    def _handle_list(self):
+    def _handle_status(self):
+        status = {"server": "DOWN", "wsbridge": "DOWN", "mongodb": "DOWN", "uptime": 0, "memory_mb": 0}
+
+        # Game server (port 44444)
         try:
-            result = subprocess.run(
-                ["mongosh", "go2super", "-u", "galaxybot", "-p", "Hak4oYk44ZahfRrepkFc",
-                 "--quiet", "--eval", """
-                    var accounts = [];
-                    db.game_users.find().sort({userId:1}).forEach(function(u) {
-                        var p = db.game_planets.findOne({type:"USER_PLANET", userId: NumberInt(u.userId.valueOf())});
-                        accounts.push({
-                            username: u.username,
-                            userId: NumberInt(u.userId.valueOf()),
-                            guid: u.guid,
-                            ground: u.ground,
-                            planet: p ? "YES " + JSON.stringify(p.position) : "NONE"
-                        });
-                    });
-                    print(JSON.stringify(accounts));
-                """],
-                capture_output=True, text=True, timeout=15,
-                env={**os.environ, "HOME": "/root"}
-            )
-            output = result.stdout.strip()
-            accounts = json.loads(output) if output else []
-            self._respond(200, "OK", {"accounts": accounts, "count": len(accounts)})
-        except Exception as e:
-            self._respond(500, "LIST_ERROR", str(e))
+            s2 = socket.socket()
+            s2.settimeout(3)
+            s2.connect(("127.0.0.1", 44444))
+            s2.sendall(b"GET /dashboard.html HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+            resp = s2.recv(1024)
+            s2.close()
+            status["server"] = "UP" if b"200 OK" in resp else "ERR"
+        except: status["server"] = "DOWN"
+
+        # WS bridge (port 44445)
+        try:
+            s3 = socket.socket()
+            s3.settimeout(3)
+            s3.connect(("127.0.0.1", 44445))
+            s3.close()
+            status["wsbridge"] = "UP"
+        except: status["wsbridge"] = "DOWN"
+
+        # MongoDB
+        try:
+            r = subprocess.run(["mongosh", MONGO_URI, "--quiet", "--eval", "db.runCommand({ping:1}).ok"], capture_output=True, text=True, timeout=5)
+            status["mongodb"] = "UP" if r.stdout.strip() == "1" else "DOWN"
+        except: status["mongodb"] = "DOWN"
+
+        # Process info
+        try:
+            pid = subprocess.run(["pgrep", "-f", "game-server-patched"], capture_output=True, text=True, timeout=5)
+            if pid.stdout.strip():
+                r = subprocess.run(["ps", "-o", "rss=,etime=", "-p", pid.stdout.strip().split("\n")[0]], capture_output=True, text=True, timeout=5)
+                parts = r.stdout.strip().split()
+                if len(parts) >= 2:
+                    status["memory_mb"] = round(int(parts[0]) / 1024)
+                    status["uptime"] = parts[1]
+        except: pass
+
+        self._respond(200, "OK", status)
 
     def _handle_finalize(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -339,6 +363,7 @@ class AdminRegisterHandler(BaseHTTPRequestHandler):
         self.send_response(200 if code == 200 else code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Connection", "close")
         self.end_headers()
         resp = {"code": code, "message": message}
         if detail:
