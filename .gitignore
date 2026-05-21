@@ -2,4 +2,3 @@
 backups/
 *.pyc
 __pycache__/
-userdb_dump/
