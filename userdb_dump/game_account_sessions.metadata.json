@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"token":{"$numberInt":"1"}},"name":"token_1","unique":true},{"v":{"$numberInt":"2"},"key":{"accountId":{"$numberInt":"1"}},"name":"accountId_1"}],"uuid":"8c054bd9511643aaacced55c961d4d3a","collectionName":"game_account_sessions","type":"collection"}

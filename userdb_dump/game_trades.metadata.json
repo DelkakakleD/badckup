@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"tradeType":{"$numberInt":"1"},"priceType":{"$numberInt":"-1"},"price":{"$numberInt":"1"}},"name":"tradeType_1_priceType_-1_price_1"}],"uuid":"e5b701279fed447bb7810d4700aa80bd","collectionName":"game_trades","type":"collection"}

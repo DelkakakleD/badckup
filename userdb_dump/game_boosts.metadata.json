@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"mimeType":{"$numberInt":"1"}},"name":"mimeType_1"},{"v":{"$numberInt":"2"},"key":{"propId":{"$numberInt":"1"}},"name":"propId_1"}],"uuid":"a6bec44dc44b4f829b1ed7ce0ed416f8","collectionName":"game_boosts","type":"collection"}
