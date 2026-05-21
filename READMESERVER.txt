@@ -952,7 +952,7 @@ while (userCache.findByGuid(newUser.getGuid()) != null) {
 ## Current Server State
 
 - **JAR**: `/home/kali/Desktop/SRVRINSTALL/game-server-0.8.1.jar` (62.7MB, built May 19 07:11)
-- **Running**: Yes (ports 9090, 5150, 90, 9091 active)
+- **Running**: Yes (ports 44444, 5150, 90, 44445 active)
 - **MongoDB**: Connected (galaxybot:Hak4oYk44ZahfRrepkFc@127.0.0.1:27017/go2super)
 - **Git**: Pushed to origin/master
 
